@@ -11,7 +11,36 @@ const timeout = (ms) =>
     setTimeout(() => reject(new Error(`Groq request timed out after ${ms}ms`)), ms)
   );
 
-const TIMEOUT_MS = 15_000;
+const TIMEOUT_MS = 30_000;
+
+/**
+ * Safely parse a JSON array from raw model text.
+ * Recovers truncated JSON if the model runs out of tokens at an object boundary.
+ * @param {string} rawText
+ * @returns {any[]}
+ */
+const parseJsonArraySafely = (rawText) => {
+  if (!rawText || typeof rawText !== 'string') return [];
+  const startIdx = rawText.indexOf('[');
+  if (startIdx === -1) return [];
+  const textFromBracket = rawText.slice(startIdx);
+  const endIdx = textFromBracket.lastIndexOf(']');
+  if (endIdx !== -1) {
+    try {
+      const parsed = JSON.parse(textFromBracket.slice(0, endIdx + 1));
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {}
+  }
+  // Fallback for truncated outputs: close array after last complete object '}'
+  const lastBrace = textFromBracket.lastIndexOf('}');
+  if (lastBrace !== -1) {
+    try {
+      const parsed = JSON.parse(textFromBracket.slice(0, lastBrace + 1) + ']');
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {}
+  }
+  return [];
+};
 
 /**
  * Build a consistent aiMetadata object from a Groq response.
@@ -52,23 +81,13 @@ export const extractSkillsFromResume = async (resumeText) => {
           },
         ],
         temperature: 0.1,
-        max_tokens: 500,
+        max_tokens: 1500,
       }),
       timeout(TIMEOUT_MS),
     ]);
 
     const text = response.choices[0]?.message?.content?.trim() || '[]';
-    const startIdx = text.indexOf('[');
-    const endIdx = text.lastIndexOf(']');
-    const cleaned = startIdx !== -1 && endIdx !== -1 ? text.slice(startIdx, endIdx + 1) : text;
-
-    let skills = [];
-    try {
-      const parsed = JSON.parse(cleaned);
-      skills = Array.isArray(parsed) ? parsed : [];
-    } catch {
-      skills = [];
-    }
+    const skills = parseJsonArraySafely(text);
 
     return { skills, aiMetadata: buildAiMetadata(response, modelName) };
   } catch (error) {
@@ -160,23 +179,14 @@ export const generateRoadmap = async (missingSkills, careerRoleTitle) => {
           },
         ],
         temperature: 0.3,
-        max_tokens: 1000,
+        max_tokens: 2500,
       }),
       timeout(TIMEOUT_MS),
     ]);
 
     const text = response.choices[0]?.message?.content?.trim() || '[]';
-    const startIdx = text.indexOf('[');
-    const endIdx = text.lastIndexOf(']');
-    const cleaned = startIdx !== -1 && endIdx !== -1 ? text.slice(startIdx, endIdx + 1) : text;
-
-    let steps = defaultStep;
-    try {
-      const parsed = JSON.parse(cleaned);
-      steps = Array.isArray(parsed) && parsed.length > 0 ? parsed : defaultStep;
-    } catch {
-      steps = defaultStep;
-    }
+    const parsed = parseJsonArraySafely(text);
+    const steps = parsed.length > 0 ? parsed : defaultStep;
 
     return { steps, aiMetadata: buildAiMetadata(response, modelName) };
   } catch (error) {
@@ -209,23 +219,13 @@ export const extractSkillsFromJD = async (jdText) => {
           { role: 'user', content: safeJdText },
         ],
         temperature: 0.1,
-        max_tokens: 1000,
+        max_tokens: 2500,
       }),
       timeout(TIMEOUT_MS),
     ]);
 
     const rawText = response.choices[0]?.message?.content || '[]';
-    const startIdx = rawText.indexOf('[');
-    const endIdx = rawText.lastIndexOf(']');
-    const jsonStr = startIdx !== -1 && endIdx !== -1 ? rawText.slice(startIdx, endIdx + 1) : '[]';
-
-    let skills = [];
-    try {
-      const parsed = JSON.parse(jsonStr);
-      skills = Array.isArray(parsed) ? parsed : [];
-    } catch {
-      skills = [];
-    }
+    const skills = parseJsonArraySafely(rawText);
 
     return { skills, aiMetadata: buildAiMetadata(response, modelName) };
   } catch (error) {
