@@ -33,7 +33,7 @@ const buildAiMetadata = (response, modelName) => ({
  * @returns {Promise<{ skills: string[], aiMetadata: object }>}
  */
 export const extractSkillsFromResume = async (resumeText) => {
-  const modelName = process.env.GROQ_MODEL_LARGE || 'llama-3.3-70b-versatile';
+  const modelName = process.env.GROQ_MODEL_LARGE || 'qwen/qwen3.8-27b';
   // Security: redact PII then strip injection patterns
   const safeText = sanitizeForLLM(redactPII(resumeText));
 
@@ -58,7 +58,9 @@ export const extractSkillsFromResume = async (resumeText) => {
     ]);
 
     const text = response.choices[0]?.message?.content?.trim() || '[]';
-    const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const startIdx = text.indexOf('[');
+    const endIdx = text.lastIndexOf(']');
+    const cleaned = startIdx !== -1 && endIdx !== -1 ? text.slice(startIdx, endIdx + 1) : text;
 
     let skills = [];
     try {
@@ -83,7 +85,7 @@ export const extractSkillsFromResume = async (resumeText) => {
  * @returns {Promise<{ explanation: string, aiMetadata: object }>}
  */
 export const generateGapExplanation = async (matchedSkills, missingSkills, careerRoleTitle) => {
-  const modelName = process.env.GROQ_MODEL_FAST || 'llama-3.1-8b-instant';
+  const modelName = process.env.GROQ_MODEL_FAST || 'qwen/qwen3.8-27b';
 
   try {
     const missingNames = missingSkills.map((s) => s.skillName).join(', ');
@@ -126,7 +128,7 @@ export const generateGapExplanation = async (matchedSkills, missingSkills, caree
  * @returns {Promise<{ steps: Array, aiMetadata: object }>}
  */
 export const generateRoadmap = async (missingSkills, careerRoleTitle) => {
-  const modelName = process.env.GROQ_MODEL_LARGE || 'llama-3.3-70b-versatile';
+  const modelName = process.env.GROQ_MODEL_LARGE || 'qwen/qwen3.8-27b';
   const defaultStep = [
     {
       title: `Learn fundamentals for ${careerRoleTitle}`,
@@ -164,7 +166,9 @@ export const generateRoadmap = async (missingSkills, careerRoleTitle) => {
     ]);
 
     const text = response.choices[0]?.message?.content?.trim() || '[]';
-    const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const startIdx = text.indexOf('[');
+    const endIdx = text.lastIndexOf(']');
+    const cleaned = startIdx !== -1 && endIdx !== -1 ? text.slice(startIdx, endIdx + 1) : text;
 
     let steps = defaultStep;
     try {
@@ -188,33 +192,44 @@ export const generateRoadmap = async (missingSkills, careerRoleTitle) => {
  * @returns {Promise<{ skills: Array<{skillName: string, level: string, weight: number}>, aiMetadata: object }>}
  */
 export const extractSkillsFromJD = async (jdText) => {
-  const modelName = process.env.GROQ_MODEL_LARGE || 'llama-3.3-70b-versatile';
+  const modelName = process.env.GROQ_MODEL_LARGE || 'qwen/qwen3.8-27b';
   // Security: sanitize JD text before sending to LLM
   const safeJdText = sanitizeForLLM(jdText);
 
-  const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Groq timeout')), 15000)
-  );
-
-  const request = groq.chat.completions.create({
-    model: modelName,
-    messages: [
-      {
-        role: 'system',
-        content: 'You are a skill extractor. Extract required skills from the job description or role prompt. Return ONLY a JSON array of objects with shape { skillName: string, level: "beginner"|"intermediate"|"advanced", weight: number between 1 and 10 }. Focus on technical and domain-specific skills only. Exclude generic soft skills such as communication, teamwork, leadership, time management, adaptability, problem solving, collaboration, and mentorship. No preamble, no markdown.',
-      },
-      { role: 'user', content: safeJdText },
-    ],
-    max_tokens: 1000,
-  });
-
   try {
-    const response = await Promise.race([request, timeoutPromise]);
-    const text = response.choices[0]?.message?.content || '[]';
-    const clean = text.replace(/```json|```/g, '').trim();
-    const skills = JSON.parse(clean);
+    const response = await Promise.race([
+      groq.chat.completions.create({
+        model: modelName,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a skill extractor. Extract required skills from the job description or role prompt. Return ONLY a JSON array of objects with shape { skillName: string, level: "beginner"|"intermediate"|"advanced", weight: number between 1 and 10 }. Focus on technical and domain-specific skills only. Exclude generic soft skills such as communication, teamwork, leadership, time management, adaptability, problem solving, collaboration, and mentorship. No preamble, no markdown.',
+          },
+          { role: 'user', content: safeJdText },
+        ],
+        temperature: 0.1,
+        max_tokens: 1000,
+      }),
+      timeout(TIMEOUT_MS),
+    ]);
+
+    const rawText = response.choices[0]?.message?.content || '[]';
+    const startIdx = rawText.indexOf('[');
+    const endIdx = rawText.lastIndexOf(']');
+    const jsonStr = startIdx !== -1 && endIdx !== -1 ? rawText.slice(startIdx, endIdx + 1) : '[]';
+
+    let skills = [];
+    try {
+      const parsed = JSON.parse(jsonStr);
+      skills = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      skills = [];
+    }
+
     return { skills, aiMetadata: buildAiMetadata(response, modelName) };
-  } catch {
+  } catch (error) {
+    console.error('extractSkillsFromJD error:', error.message);
     return { skills: [], aiMetadata: buildAiMetadata(null, modelName) };
   }
 };

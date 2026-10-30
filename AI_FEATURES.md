@@ -7,7 +7,7 @@ SGIP uses the Groq API (hosted LLM inference) for three AI-powered features. All
 
 ### 1. Resume Skill Extraction
 **Endpoint:** `POST /api/resume/parse`  
-**Model:** `llama-3.3-70b-versatile`  
+**Model:** `qwen/qwen3.8-27b`  
 **Input:** PDF resume text (after PII redaction and prompt injection sanitization)  
 **Output:** JSON array of skill name strings  
 **Rate limit:** 4 requests per hour per user  
@@ -16,7 +16,7 @@ SGIP uses the Groq API (hosted LLM inference) for three AI-powered features. All
 
 ### 2. Gap Analysis Explanation
 **Endpoint:** `POST /api/gap/analyse`  
-**Model:** `llama-3.1-8b-instant`  
+**Model:** `qwen/qwen3.8-27b`  
 **Input:** List of matched and missing skills, target role title  
 **Output:** Plain text explanation (max 300 tokens)  
 **Fallback:** Returns `"Unable to generate explanation at this time."` on failure. Gap score is still calculated and saved using the deterministic engine.  
@@ -24,7 +24,7 @@ SGIP uses the Groq API (hosted LLM inference) for three AI-powered features. All
 
 ### 3. Roadmap Generation
 **Endpoint:** `POST /api/roadmap/generate`  
-**Model:** `llama-3.3-70b-versatile`  
+**Model:** `qwen/qwen3.8-27b`  
 **Input:** List of missing skills with levels and weights, target role title  
 **Output:** JSON array of roadmap steps `[{ title, description, resourceUrl, order }]`  
 **Rate limit:** Covered by gap analysis rate limit  
@@ -32,7 +32,7 @@ SGIP uses the Groq API (hosted LLM inference) for three AI-powered features. All
 **Validation:** Output must be a JSON array. Non-array responses trigger the fallback.
 
 ### 4. JD Skill Extraction (Gap Analysis — JD Mode)
-**Model:** `llama-3.3-70b-versatile`  
+**Model:** `openai/gpt-oss-20b`  
 **Input:** Job description text (sanitized for prompt injection)  
 **Output:** JSON array of `{ skillName, level, weight }` objects  
 **Fallback:** Returns empty array. User sees "Could not extract skills from job description."

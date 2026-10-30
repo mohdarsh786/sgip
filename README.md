@@ -66,7 +66,7 @@ The Skill Gap Intelligence Platform (SGIP) is a comprehensive web application de
 
 ## Features
 
--  **AI Resume Parsing**: Extracts skills directly from user resumes using LLaMA 3.3.
+-  **AI Resume Parsing**: Extracts skills directly from user resumes using Qwen 3.8 27B on Groq.
 -  **Gap Analysis (Role + JD mode)**: Calculates skill compatibility against predefined career roles or custom Job Descriptions.
 -  **Fuzzy Skill Matching**: Deterministically matches overlapping user skills with industry requirements using Jaccard similarity.
 -  **Personalized Roadmap**: Generates detailed, step-by-step learning roadmaps to acquire missing skills.
@@ -100,8 +100,9 @@ The Skill Gap Intelligence Platform (SGIP) is a comprehensive web application de
 ![Cloudinary](https://img.shields.io/badge/Cloudinary-Media-3448C5?style=for-the-badge&logo=cloudinary&logoColor=white)
 
 ### AI
-![Groq](https://img.shields.io/badge/Groq-LLaMA_3.3-F55036?style=for-the-badge&logo=meta&logoColor=white)
-![LLaMA 3.1](https://img.shields.io/badge/Meta-LLaMA_3.1-0467DF?style=for-the-badge&logo=meta&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq-LPU_Inference-F55036?style=for-the-badge)
+![Qwen](https://img.shields.io/badge/Qwen-3.8_27B-615ced?style=for-the-badge)
+![OpenAI](https://img.shields.io/badge/OpenAI-GPT--OSS_20B-412991?style=for-the-badge&logo=openai&logoColor=white)
 
 ### Cloud
 ![Vercel](https://img.shields.io/badge/Vercel-Deployed-000000?style=for-the-badge&logo=vercel&logoColor=white)
@@ -135,14 +136,13 @@ The Skill Gap Intelligence Platform (SGIP) is a comprehensive web application de
 
 ## AI Pipeline
 
-```text
-Resume PDF ──► pdf2json ──► PII Redaction ──► Groq LLM (LLaMA 3.3) ──► Skill Array
-                                                                         │
-                                                                         ▼
-                                                                  Fuzzy Gap Engine
-                                                                         │
-    Roadmap ◄── AI Explanation (LLaMA 3.1) ◄── Compatibility Score ◄─────┘
-```
+Resume PDF ──► pdf2json ──► PII Redaction ──► Groq LLM (Qwen 3.8 27B) ──► Skill Array
+                                                                             │
+                                                                             ▼
+                                                                      Fuzzy Gap Engine
+                                                                             │
+    Roadmap ◄── AI Explanation (GPT-OSS / Qwen) ◄── Compatibility Score ◄────┘
+
 
 ##  Security Features
 
